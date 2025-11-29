@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace PluginsAutoUpdate;
 
 public sealed record AutoUpdateConfig

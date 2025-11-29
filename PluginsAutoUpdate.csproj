@@ -10,6 +10,8 @@
     <AssemblyName>PluginsAutoUpdate</AssemblyName>
     <OutputPath>$(MSBuildThisFileDirectory)build/</OutputPath>
     <PublishDir>$(OutputPath)publish/PluginsAutoUpdate</PublishDir>
+    <!-- Suppress IDE0130 due flat namespace -->
+    <NoWarn>$(NoWarn);IDE0130</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
