@@ -1,77 +1,135 @@
 <div align="center">
-  <img src="https://pan.samyyc.dev/s/VYmMXE" />
-  <h2><strong>Experimental - PluginsAutoUpdate</strong></h2>
-  <h3>Checks the github releases and compare the versions for update. If update available will update.</h3>
+
+# [SwiftlyS2] PluginsAutoUpdate
+
+[![GitHub Release](https://img.shields.io/github/v/release/agasking1337/PluginsAutoUpdate?color=FFFFFF&style=flat-square)](https://github.com/agasking1337/PluginsAutoUpdate/releases/latest)
+[![GitHub Issues](https://img.shields.io/github/issues/agasking1337/PluginsAutoUpdate?color=FF0000&style=flat-square)](https://github.com/agasking1337/PluginsAutoUpdate/issues)
+[![GitHub Downloads](https://img.shields.io/github/downloads/agasking1337/PluginsAutoUpdate/total?color=blue&style=flat-square)](https://github.com/agasking1337/PluginsAutoUpdate/releases)
+[![GitHub Stars](https://img.shields.io/github/stars/agasking1337/PluginsAutoUpdate?style=social)](https://github.com/agasking1337/PluginsAutoUpdate/stargazers)<br/>
+  <sub>Made by <a href="https://github.com/agasking1337" rel="noopener noreferrer" target="_blank">aga</a></sub>
+  <br/>
 </div>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/build-passing-brightgreen" alt="Build Status">
-  <img src="https://img.shields.io/github/downloads/aga/PluginsAutoUpdate/total" alt="Downloads">
-  <img src="https://img.shields.io/github/stars/aga/PluginsAutoUpdate?style=flat&logo=github" alt="Stars">
-  <img src="https://img.shields.io/github/license/aga/PluginsAutoUpdate" alt="License">
-</p>
+## Overview
 
-## Getting Started (delete me)
+**PluginsAutoUpdate** is an experimental auto-updater plugin for SwiftlyS2 that automatically checks GitHub releases and updates your plugins when new versions are available. It monitors configured repositories, compares versions, and seamlessly updates plugins by downloading and replacing DLL files or extracting ZIP packages while preserving your configuration files.
 
-1. **Edit `PluginMetadata` Attribute**  
-   - Set your plugin's `Id`, `Name`, `Version`, `Author` and `Description`.
-2. **Edit `PluginsAutoUpdate.csproj`**  
-   - Set the `<AssemblyName>` property to match your plugin's main class name.
-   - Add any additional dependencies as needed.
-3. **Implement your plugin logic** in C#.
-   - Place your main plugin class in the root of the project.
-   - Use the SwiftlyS2 managed API to interact with the game and core.
-4. **Add resources**  
-   - Place any required files in the `gamedata`, `templates`, or `translations` folders as needed.
+> [!CAUTION]
+> This is an **experimental plugin**. It makes HTTP requests to GitHub and overwrites plugin files on disk. **Use at your own risk and keep backups.** While it works with Swiftly's hot-reload, for consistent behavior you should treat updates as requiring a **full server restart**.
 
-## Building
+## Download Shortcuts
+<ul>
+  <li>
+    <code>📦</code>
+    <strong>&nbspDownload Latest Plugin Version</strong> ⇢
+    <a href="https://github.com/agasking1337/PluginsAutoUpdate/releases/latest" target="_blank" rel="noopener noreferrer">Click Here</a>
+  </li>
+  <li>
+    <code>⚙️</code>
+    <strong>&nbspDownload Latest SwiftlyS2 Version</strong> ⇢
+    <a href="https://github.com/swiftly-solution/swiftlys2/releases/latest" target="_blank" rel="noopener noreferrer">Click Here</a>
+  </li>
+</ul>
 
-- Open the project in your preferred .NET IDE (e.g., Visual Studio, Rider, VS Code).
-- Build the project. The output DLL and resources will be placed in the `build/` directory.
-- The publish process will also create a zip file for easy distribution.
+## Features
+- **Automatic Updates**: Periodically checks GitHub releases for configured plugins and updates them automatically.
+- **Version Tracking**: Smart version comparison using DLL metadata and `.version` sidecar files with hash verification.
+- **Multiple Format Support**: Handles both single DLL files and ZIP packages containing full plugin folders.
+- **Config Protection**: Preserves existing configuration files during ZIP-based updates to prevent data loss.
+- **Manual Checks**: Use the `checkupdate` console command to trigger updates on demand.
+- **Backup System**: Creates `.bak` backup files before replacing DLLs for easy rollback.
+- **Flexible Repository Format**: Supports both `Owner/Repo` format and full GitHub URLs.
 
-## Publishing
+## Screenshots
+> No screenshots needed for this plugin.
 
-- Use the `dotnet publish -c Release` command to build and package your plugin.
-- Distribute the generated zip file or the contents of the `build/publish` directory.
+## Plugin Setup
+> [!WARNING]
+> Make sure you **have installed SwiftlyS2 Framework** before proceeding.
 
-## Experimental notice
+1. Download and extract the latest plugin version into your `swiftlys2/plugins/PluginsAutoUpdate` folder.
+2. Start your server to allow the plugin to generate the default configuration file.
+3. The configuration file will be created at: `swiftlys2/configs/plugins/PluginsAutoUpdate/config.toml`
+4. Edit the configuration file to add the plugins you want to auto-update (see Configuration Guide below).
+5. Restart the server or reload the plugin to apply changes.
+6. The plugin will now automatically check for updates based on your configured interval.
 
-This is an **experimental auto-updater**, not a fully supported production plugin.  
-It makes HTTP requests to GitHub and overwrites plugin files on disk. **Use at your own risk and keep backups.**  
-It also relies on Swiftly's hot-reload behaviour, which is **not ideal** for many plugins – for consistent behaviour you should treat updates as requiring a **full server restart**.
+## Configuration Guide
 
-## How it works (short)
+The plugin uses a TOML configuration file located at `configs/plugins/PluginsAutoUpdate/config.toml`.
 
-- Reads config from `configs/plugins/PluginsAutoUpdate/config.toml`.
-- Every `CheckIntervalMinutes` minutes it:
-  - For each entry in `[PluginsAutoUpdate.Repositories]` (key = plugin folder name, value = `Owner/Repo` or GitHub URL), calls `/releases/latest`.
-  - Compares the latest tag (e.g. `v1.0.4`) with the local version (DLL / `.version` sidecar).
-  - If remote > local:
-    - **DLL asset** → replace main DLL (backup `.bak` when possible).
-    - **ZIP asset** → extract and copy the whole plugin folder into `<swiftly_root>/plugins/<PluginName>/`, but do **not** overwrite existing files under `configs/`.
-
-## Quick config
-
-File (auto-created on first run):
-
-```text
-<swiftly_root>/configs/plugins/PluginsAutoUpdate/config.toml
-```
-
-Minimal example:
+**Basic Configuration:**
 
 ```toml
 [PluginsAutoUpdate]
 CheckIntervalMinutes = 30
 
 [PluginsAutoUpdate.Repositories]
-PluginFolder = "Owner/Repo"
+# Format: PluginFolderName = "Owner/Repo"
+# or: PluginFolderName = "https://github.com/Owner/Repo"
+ExamplePlugin = "someuser/example-plugin"
+AnotherPlugin = "https://github.com/anotheruser/another-plugin"
 ```
 
-Steps:
+**Configuration Options:**
 
-1. Install the plugin normally in `plugins/`.
-2. Start the server once so `config.toml` is created.
-3. Edit `[PluginsAutoUpdate.Repositories]` and add your `PluginFolder = "Owner/Repo"`.
-4. Restart server or reload the plugin.
+- `CheckIntervalMinutes` (default: 30): How often the plugin checks for updates (minimum 1 minute).
+- `Repositories`: Key-value pairs where:
+  - **Key**: The exact plugin folder name in `swiftlys2/plugins/`
+  - **Value**: GitHub repository in format `Owner/Repo` or full URL
+
+**Example with Multiple Plugins:**
+
+```toml
+[PluginsAutoUpdate]
+CheckIntervalMinutes = 60
+
+[PluginsAutoUpdate.Repositories]
+GameManager = "criskkky/sws2-gamemanager"
+MapConfigs = "https://github.com/criskkky/sws2-mapconfigs"
+```
+
+## Backend Logic (How It Works)
+
+1. **Initialization**: On plugin load, the service provider is created with dependency injection, initializing all services (Configuration, GitHub API, Version Management, Update).
+
+2. **Scheduled Checks**: Every `CheckIntervalMinutes`, the plugin:
+   - Reloads the configuration to pick up any changes
+   - Iterates through all configured repositories
+   - For each repository, calls GitHub's `/releases/latest` API endpoint
+
+3. **Version Comparison**:
+   - Extracts the version tag from the latest GitHub release (e.g., `v1.0.4`)
+   - Checks local version using this priority:
+     1. `.version` sidecar file with SHA256 hash verification
+     2. DLL assembly version metadata
+     3. DLL file version info
+     4. Live loaded plugin version from memory
+
+4. **Update Process** (when remote version > local version):
+   - **For DLL assets**: Downloads the file, creates a `.bak` backup, and replaces the plugin DLL
+   - **For ZIP assets**: Downloads and extracts to a temporary folder, finds the main DLL, copies all files to the plugin folder while **preserving existing config files**
+
+5. **Version Persistence**: After successful updates, creates/updates a `.version` sidecar file containing the version and file hash for future comparisons.
+
+6. **Manual Trigger**: The `checkupdate` console command runs the same update check logic immediately without waiting for the scheduled interval.
+
+## Commands
+
+- `checkupdate` - Manually trigger an update check for all configured plugins (console only)
+
+## Support and Feedback
+Feel free to [open an issue](https://github.com/agasking1337/PluginsAutoUpdate/issues/new) for any bugs or feature requests. If it's all working fine, consider starring the repository to show your support!
+
+## Contribution Guidelines
+Contributions are welcome! This plugin has been refactored with clean architecture principles including:
+- Separation of responsibilities (Services pattern)
+- Dependency injection with IServiceProvider
+- Interface-based design for testability
+
+For major changes, please open an issue first to discuss what you would like to change.
+
+## Credits
+- Developed by [aga](https://github.com/agasking1337)
+- Readme template by [criskkky](https://github.com/criskkky)
+- All contributors listed in the [Contributors Section](https://github.com/agasking1337/PluginsAutoUpdate/graphs/contributors)

@@ -1,7 +1,4 @@
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Commands;
 
 namespace PluginsAutoUpdate;
@@ -19,21 +16,17 @@ public partial class PluginsAutoUpdate
 
     context.Reply("[PluginsAutoUpdate] Checking for plugin updates...");
 
-    if (_config == null)
+    if (_updateService == null)
     {
-      _config = LoadConfig();
-      if (_config == null)
-      {
-        Core.Logger.LogWarning("PluginsAutoUpdate: config not found or invalid.");
-        return;
-      }
+      Core.Logger.LogError("PluginsAutoUpdate: update service not initialized.");
+      return;
     }
 
     Task.Run(async () =>
     {
       try
       {
-        await CheckAllRepositoriesAsync(context, CancellationToken.None);
+        await _updateService.CheckAllRepositoriesAsync(context, CancellationToken.None);
         context.Reply("[PluginsAutoUpdate] Manual check finished.");
       }
       catch (Exception ex)
