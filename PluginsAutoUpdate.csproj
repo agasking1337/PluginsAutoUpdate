@@ -39,7 +39,8 @@
       <PublishFiles Include="$(PublishDir)**\*.*" />
     </ItemGroup>
     
-    <ZipDirectory SourceDirectory="$(PublishDir)../" DestinationFile="$(OutputPath)../$(AssemblyName).zip" Overwrite="true" />
+    <!-- Zip only the publish output folder; destination is outside the source directory -->
+    <ZipDirectory SourceDirectory="$(PublishDir)" DestinationFile="$(OutputPath)$(AssemblyName).zip" Overwrite="true" />
   </Target>
 
 </Project> 
