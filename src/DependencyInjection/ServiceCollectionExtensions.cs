@@ -28,6 +28,8 @@ public static class ServiceCollectionExtensions
     services.AddSingleton<IVersionService, VersionService>();
     services.AddSingleton<IGitHubService, GitHubService>();
     services.AddSingleton<IUpdateService, UpdateService>();
+    services.AddSingleton<ICronService, CronService>();
+    services.AddSingleton<IDiscordService, DiscordService>();
 
     return services;
   }

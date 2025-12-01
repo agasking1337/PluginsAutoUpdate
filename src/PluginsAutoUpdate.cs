@@ -5,7 +5,7 @@ using SwiftlyS2.Shared.Plugins;
 
 namespace PluginsAutoUpdate;
 
-[PluginMetadata(Id = "PluginsAutoUpdate", Version = "0.0.3-beta", Name = "PluginsAutoUpdate", Author = "aga", Description = "Checks GitHub releases for plugins and updates them.")]
+[PluginMetadata(Id = "PluginsAutoUpdate", Version = "0.0.2-beta", Name = "PluginsAutoUpdate", Author = "aga", Description = "Checks GitHub releases for plugins and updates them.")]
 public partial class PluginsAutoUpdate : BasePlugin
 {
   private CancellationTokenSource? _cts;
@@ -14,6 +14,7 @@ public partial class PluginsAutoUpdate : BasePlugin
   // Services resolved from DI container
   private IConfigurationService? _configService;
   private IUpdateService? _updateService;
+  private ICronService? _cronService;
 
   public PluginsAutoUpdate(ISwiftlyCore core) : base(core)
   {
@@ -46,6 +47,11 @@ public partial class PluginsAutoUpdate : BasePlugin
     _cts = new CancellationTokenSource();
     var token = _cts.Token;
 
+    if (_cronService != null)
+    {
+      Task.Run(() => _cronService.StartAsync(token), token);
+    }
+
     Task.Run(async () =>
     {
       while (!token.IsCancellationRequested)
@@ -61,7 +67,7 @@ public partial class PluginsAutoUpdate : BasePlugin
           }
 
           Core.Logger.LogInformation("PluginsAutoUpdate: running scheduled update check (interval {Minutes} min).", config.CheckIntervalMinutes);
-          await _updateService.CheckAllRepositoriesAsync(null, token);
+          await _updateService.CheckAllRepositoriesForUpdatesOnlyAsync(null, token);
         }
         catch (Exception ex)
         {
@@ -103,6 +109,7 @@ public partial class PluginsAutoUpdate : BasePlugin
       // Resolve services from DI container
       _configService = _serviceProvider.GetRequiredService<IConfigurationService>();
       _updateService = _serviceProvider.GetRequiredService<IUpdateService>();
+      _cronService = _serviceProvider.GetRequiredService<ICronService>();
     
       Core.Logger.LogInformation("PluginsAutoUpdate: services initialized successfully via DI.");
     }

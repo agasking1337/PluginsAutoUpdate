@@ -14,6 +14,8 @@ public interface IUpdateService
   /// <param name="token">Cancellation token</param>
   Task CheckAllRepositoriesAsync(ICommandContext? context, CancellationToken token);
 
+  Task CheckAllRepositoriesForUpdatesOnlyAsync(ICommandContext? context, CancellationToken token);
+
   /// <summary>
   /// Downloads and replaces a plugin with a new version.
   /// </summary>

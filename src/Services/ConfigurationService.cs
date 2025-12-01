@@ -11,6 +11,7 @@ namespace PluginsAutoUpdate;
 public sealed class ConfigurationService : IConfigurationService
 {
   private readonly ILogger _logger;
+  private static bool _configPathLogged;
 
   public ConfigurationService(ILogger logger)
   {
@@ -28,7 +29,11 @@ public sealed class ConfigurationService : IConfigurationService
 
       var configPath = Path.Combine(configDir, "config.toml");
       var exists = File.Exists(configPath);
-      _logger.LogInformation("Using config path {Path} (exists: {Exists}).", configPath, exists);
+      if (!_configPathLogged)
+      {
+        _logger.LogInformation("Using config path {Path} (exists: {Exists}).", configPath, exists);
+        _configPathLogged = true;
+      }
 
       if (!exists)
       {
@@ -69,6 +74,9 @@ public sealed class ConfigurationService : IConfigurationService
   {
     var defaultToml = "[PluginsAutoUpdate]\n" +
                       "CheckIntervalMinutes = 30\n" +
+                      "DailyUpdateTimeUtc = \"03:00:00\"\n" +
+                      "# Optional: Discord webhook URL for update notifications\n" +
+                      "# DiscordWebhookUrl = \"https://discord.com/api/webhooks/...\"\n" +
                       "\n" +
                       "# Repositories are defined as PluginName = Repo string under this table:\n" +
                       "[PluginsAutoUpdate.Repositories]\n" +

@@ -39,6 +39,8 @@
 - **Manual Checks**: Use the `checkupdate` console command to trigger updates on demand.
 - **Backup System**: Creates `.bak` backup files before replacing DLLs for easy rollback.
 - **Flexible Repository Format**: Supports both `Owner/Repo` format and full GitHub URLs.
+- **Scheduled Daily Updates**: Optional fixed-time daily update window via `DailyUpdateTimeUtc` (UTC).
+- **Discord Notifications**: Optional Discord webhook notifications on successful or failed plugin updates.
 
 ## Screenshots
 > No screenshots needed for this plugin.
@@ -63,6 +65,8 @@ The plugin uses a TOML configuration file located at `configs/plugins/PluginsAut
 ```toml
 [PluginsAutoUpdate]
 CheckIntervalMinutes = 30
+DailyUpdateTimeUtc = "03:00:00" # Optional: daily update time in UTC (HH:mm:ss)
+# DiscordWebhookUrl = "https://discord.com/api/webhooks/..." # Optional: Discord notifications
 
 [PluginsAutoUpdate.Repositories]
 # Format: PluginFolderName = "Owner/Repo"
@@ -74,6 +78,8 @@ AnotherPlugin = "https://github.com/anotheruser/another-plugin"
 **Configuration Options:**
 
 - `CheckIntervalMinutes` (default: 30): How often the plugin checks for updates (minimum 1 minute).
+- `DailyUpdateTimeUtc` (optional): Daily time (UTC, `HH:mm:ss`) when updates are actually applied.
+- `DiscordWebhookUrl` (optional): Discord webhook URL used for update success/failure notifications.
 - `Repositories`: Key-value pairs where:
   - **Key**: The exact plugin folder name in `swiftlys2/plugins/`
   - **Value**: GitHub repository in format `Owner/Repo` or full URL
@@ -83,6 +89,7 @@ AnotherPlugin = "https://github.com/anotheruser/another-plugin"
 ```toml
 [PluginsAutoUpdate]
 CheckIntervalMinutes = 60
+DailyUpdateTimeUtc = "04:00:00"
 
 [PluginsAutoUpdate.Repositories]
 GameManager = "criskkky/sws2-gamemanager"

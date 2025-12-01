@@ -13,12 +13,14 @@ public sealed class UpdateService : IUpdateService
   private readonly IGitHubService _gitHubService;
   private readonly ILogger _logger;
   private readonly HttpClient _httpClient;
+  private readonly IDiscordService _discordService;
 
   public UpdateService(
     IConfigurationService configService,
     IVersionService versionService,
     IGitHubService gitHubService,
     HttpClient httpClient,
+    IDiscordService discordService,
     ILogger logger)
   {
     _configService = configService;
@@ -26,6 +28,7 @@ public sealed class UpdateService : IUpdateService
     _gitHubService = gitHubService;
     _httpClient = httpClient;
     _logger = logger;
+    _discordService = discordService;
   }
 
   public async Task CheckAllRepositoriesAsync(ICommandContext? context, CancellationToken token)
@@ -88,6 +91,76 @@ public sealed class UpdateService : IUpdateService
       catch (Exception ex)
       {
         _logger.LogError(ex, "Error updating {Owner}/{Repo}.", owner, repo);
+        await _discordService.SendPluginUpdateFailureAsync(
+          pluginName,
+          owner,
+          repo,
+          ex.Message,
+          token);
+      }
+    }
+  }
+
+  public async Task CheckAllRepositoriesForUpdatesOnlyAsync(ICommandContext? context, CancellationToken token)
+  {
+    var config = _configService.LoadConfig();
+    if (config == null)
+    {
+      _logger.LogWarning("No config loaded.");
+      return;
+    }
+
+    var pluginsRoot = _configService.GetPluginsDirectory();
+    if (string.IsNullOrEmpty(pluginsRoot) || !Directory.Exists(pluginsRoot))
+    {
+      _logger.LogWarning("Plugins root directory not found at {Path}.", pluginsRoot);
+      return;
+    }
+
+    foreach (var kvp in config.Repositories)
+    {
+      if (token.IsCancellationRequested)
+        break;
+
+      var pluginName = kvp.Key;
+      var repoValue = kvp.Value;
+
+      if (string.IsNullOrWhiteSpace(repoValue))
+      {
+        _logger.LogWarning("Config entry with empty Repo.");
+        continue;
+      }
+
+      if (!TryParseRepo(repoValue, out var owner, out var repo))
+      {
+        _logger.LogWarning("Invalid repo entry '{RepoString}'", repoValue);
+        continue;
+      }
+
+      var pluginDir = Path.Combine(pluginsRoot, pluginName);
+
+      if (!Directory.Exists(pluginDir))
+      {
+        _logger.LogWarning("Plugin directory not found for repo {Owner}/{Repo} at {Path}", owner, repo, pluginDir);
+        continue;
+      }
+
+      var dllName = pluginName + ".dll";
+      var localPath = Path.Combine(pluginDir, dllName);
+
+      if (!File.Exists(localPath))
+      {
+        _logger.LogWarning("Local dll not found for repo {Owner}/{Repo} at {Path}", owner, repo, localPath);
+        continue;
+      }
+
+      try
+      {
+        await CheckPluginForUpdateOnlyAsync(pluginName, localPath, owner, repo, context, token);
+      }
+      catch (Exception ex)
+      {
+        _logger.LogError(ex, "Error checking updates for {Owner}/{Repo}.", owner, repo);
       }
     }
   }
@@ -169,11 +242,62 @@ public sealed class UpdateService : IUpdateService
     await DownloadAndReplaceAsync(localPath, remote.AssetUrl, remote.Version, token);
 
     context?.Reply($"[PluginsAutoUpdate] Updated {dllFileName} to {remote.Version}.");
+
+    var previousVersion = effectiveVersion?.ToString() ?? "unknown";
+    var newVersion = remote.Version?.ToString() ?? "unknown";
+    await _discordService.SendPluginUpdateSuccessAsync(
+      pluginName,
+      owner,
+      repo,
+      previousVersion,
+      newVersion,
+      token);
+  }
+
+  private async Task CheckPluginForUpdateOnlyAsync(
+    string pluginName,
+    string localPath,
+    string owner,
+    string repo,
+    ICommandContext? context,
+    CancellationToken token)
+  {
+    var localVersion = _versionService.GetLocalVersion(localPath);
+    var liveVersion = _versionService.GetLiveVersion(pluginName);
+
+    var effectiveVersion = localVersion ?? liveVersion;
+
+    var remote = await _gitHubService.GetLatestReleaseAsync(owner, repo, token);
+
+    if (remote == null || remote.Version == null)
+    {
+      _logger.LogWarning("Could not get latest release for {Owner}/{Repo}", owner, repo);
+      return;
+    }
+
+    if (effectiveVersion != null && remote.Version <= effectiveVersion)
+    {
+      var dllName = Path.GetFileName(localPath);
+      if (liveVersion != null && liveVersion < effectiveVersion)
+      {
+        _logger.LogInformation("{Dll} update pending restart (Live: {Live}, File: {File}).", dllName, liveVersion, effectiveVersion);
+      }
+      else
+      {
+        _logger.LogInformation("{Dll} is up to date ({Version}).", dllName, effectiveVersion);
+      }
+      return;
+    }
+
+    var dllFileName = Path.GetFileName(localPath);
+    _logger.LogInformation("{Dll} has an update available ({Current} -> {Remote}).", dllFileName, effectiveVersion, remote.Version);
+
+    context?.Reply($"[PluginsAutoUpdate] {dllFileName} has an update available: {effectiveVersion} -> {remote.Version}.");
   }
 
   private async Task HandleZipUpdateAsync(string localPath, string tempFile, string pluginsDir)
   {
-    var extractDir = Path.Combine(pluginsDir, "PluginsAutoUpdate_tmp_" + Guid.NewGuid().ToString("N"));
+    var extractDir = Path.Combine(Path.GetTempPath(), "PluginsAutoUpdate", "tmp_" + Guid.NewGuid().ToString("N"));
     Directory.CreateDirectory(extractDir);
 
     System.IO.Compression.ZipFile.ExtractToDirectory(tempFile, extractDir);
