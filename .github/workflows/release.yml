@@ -8,6 +8,8 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -35,6 +37,11 @@ jobs:
         run: |
           dotnet restore
           dotnet publish PluginsAutoUpdate.csproj -c Release -o build/publish
+
+      - name: Zip build
+        run: |
+          cd build/publish
+          zip -r ../PluginsAutoUpdate.zip .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
