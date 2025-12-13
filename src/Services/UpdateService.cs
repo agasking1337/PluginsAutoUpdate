@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Commands;
 
 namespace PluginsAutoUpdate;
@@ -8,6 +9,7 @@ namespace PluginsAutoUpdate;
 /// </summary>
 public sealed class UpdateService : IUpdateService
 {
+  private readonly ISwiftlyCore _core;
   private readonly IConfigurationService _configService;
   private readonly IVersionService _versionService;
   private readonly IGitHubService _gitHubService;
@@ -16,6 +18,7 @@ public sealed class UpdateService : IUpdateService
   private readonly IDiscordService _discordService;
 
   public UpdateService(
+    ISwiftlyCore core,
     IConfigurationService configService,
     IVersionService versionService,
     IGitHubService gitHubService,
@@ -23,6 +26,7 @@ public sealed class UpdateService : IUpdateService
     IDiscordService discordService,
     ILogger logger)
   {
+    _core = core;
     _configService = configService;
     _versionService = versionService;
     _gitHubService = gitHubService;
@@ -170,6 +174,11 @@ public sealed class UpdateService : IUpdateService
     var pluginsDir = Path.GetDirectoryName(localPath)!;
     var tempFile = Path.Combine(pluginsDir, Path.GetRandomFileName());
 
+    var pluginId = ResolvePluginIdFromLocalPath(localPath);
+    var canManagePluginLifecycle = !string.IsNullOrWhiteSpace(pluginId) &&
+                                  !string.Equals(pluginId, "PluginsAutoUpdate", StringComparison.OrdinalIgnoreCase);
+    var unloaded = false;
+
     using (var response = await _httpClient.GetAsync(assetUrl, token))
     {
       response.EnsureSuccessStatusCode();
@@ -179,19 +188,155 @@ public sealed class UpdateService : IUpdateService
 
     string finalNewDllPath = tempFile;
 
-    if (Path.GetExtension(assetUrl).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+    try
     {
-      await HandleZipUpdateAsync(localPath, tempFile, pluginsDir);
-      finalNewDllPath = localPath;
-    }
-    else
-    {
-      HandleDllUpdate(localPath, tempFile);
-    }
+      if (canManagePluginLifecycle)
+      {
+        var status = _core.PluginManager.GetPluginStatus(pluginId!);
+        if (status == null || status == SwiftlyS2.Shared.Plugins.PluginStatus.Loaded)
+        {
+          if (!_core.PluginManager.UnloadPlugin(pluginId!, silent: true))
+          {
+            _logger.LogWarning("Failed to unload plugin {PluginId} before updating {Dll}.", pluginId, Path.GetFileName(localPath));
+          }
+          else
+          {
+            unloaded = true;
+            _logger.LogInformation("Unloaded plugin {PluginId} before updating {Dll}.", pluginId, Path.GetFileName(localPath));
+          }
+        }
+      }
 
-    if (newVersion != null)
+      if (Path.GetExtension(assetUrl).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+      {
+        await HandleZipUpdateAsync(localPath, tempFile, pluginsDir);
+        finalNewDllPath = localPath;
+      }
+      else
+      {
+        HandleDllUpdate(localPath, tempFile);
+        finalNewDllPath = localPath;
+      }
+
+      if (newVersion != null)
+      {
+        _versionService.PersistVersion(finalNewDllPath, newVersion);
+      }
+    }
+    finally
     {
-      _versionService.PersistVersion(localPath, newVersion);
+      if (unloaded && canManagePluginLifecycle)
+      {
+        var dllFileName = Path.GetFileName(localPath);
+        _ = await TryEnsurePluginLoadedAsync(pluginId!, finalNewDllPath, dllFileName, token);
+      }
+    }
+  }
+
+  private static async Task WaitForFileAccessAsync(CancellationToken token, string filePath, int maxRetries = 10, int initialDelayMs = 50)
+  {
+    for (var i = 1; i <= maxRetries && !token.IsCancellationRequested; i++)
+    {
+      try
+      {
+        using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        return;
+      }
+      catch (IOException)
+      {
+        if (i < maxRetries)
+        {
+          await Task.Delay(initialDelayMs * (1 << (i - 1)), token);
+        }
+      }
+      catch
+      {
+        return;
+      }
+    }
+  }
+
+  private async Task<bool> TryEnsurePluginLoadedAsync(string pluginId, string dllPath, string dllFileName, CancellationToken token)
+  {
+    try
+    {
+      await WaitForFileAccessAsync(token, dllPath);
+
+      var loaded = _core.PluginManager.LoadPlugin(pluginId, silent: true);
+      if (loaded)
+      {
+        _logger.LogInformation("Loaded plugin {PluginId} after updating {Dll}.", pluginId, dllFileName);
+        return true;
+      }
+
+      var status = _core.PluginManager.GetPluginStatus(pluginId);
+      if (status == SwiftlyS2.Shared.Plugins.PluginStatus.Loaded)
+      {
+        _logger.LogInformation("Plugin {PluginId} is already loaded after updating {Dll}.", pluginId, dllFileName);
+        return true;
+      }
+
+      await Task.Delay(250, token);
+      await WaitForFileAccessAsync(token, dllPath);
+
+      loaded = _core.PluginManager.LoadPlugin(pluginId, silent: true);
+      if (loaded)
+      {
+        _logger.LogInformation("Loaded plugin {PluginId} after updating {Dll}.", pluginId, dllFileName);
+        return true;
+      }
+
+      status = _core.PluginManager.GetPluginStatus(pluginId);
+      if (status == SwiftlyS2.Shared.Plugins.PluginStatus.Loaded)
+      {
+        _logger.LogInformation("Plugin {PluginId} is already loaded after updating {Dll}.", pluginId, dllFileName);
+        return true;
+      }
+
+      _logger.LogWarning("Failed to load plugin {PluginId} after updating {Dll}.", pluginId, dllFileName);
+      return false;
+    }
+    catch (Exception ex)
+    {
+      _logger.LogWarning(ex, "Failed to load plugin {PluginId} after updating {Dll}.", pluginId, dllFileName);
+      return false;
+    }
+  }
+
+  private string? ResolvePluginIdFromLocalPath(string localPath)
+  {
+    try
+    {
+      var pluginDir = Path.GetDirectoryName(localPath);
+      if (string.IsNullOrWhiteSpace(pluginDir))
+      {
+        return null;
+      }
+
+      var normalizedPluginDir = Path.GetFullPath(pluginDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+      var paths = _core.PluginManager.GetPluginPaths();
+      foreach (var kvp in paths)
+      {
+        var id = kvp.Key;
+        var dir = kvp.Value;
+        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(dir))
+        {
+          continue;
+        }
+
+        var normalizedDir = Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (string.Equals(normalizedDir, normalizedPluginDir, StringComparison.OrdinalIgnoreCase))
+        {
+          return id;
+        }
+      }
+
+      return Path.GetFileNameWithoutExtension(localPath);
+    }
+    catch (Exception ex)
+    {
+      _logger.LogWarning(ex, "Failed to resolve plugin id from path {Path}", localPath);
+      return Path.GetFileNameWithoutExtension(localPath);
     }
   }
 

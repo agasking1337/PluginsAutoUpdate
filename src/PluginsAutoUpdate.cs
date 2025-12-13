@@ -5,7 +5,7 @@ using SwiftlyS2.Shared.Plugins;
 
 namespace PluginsAutoUpdate;
 
-[PluginMetadata(Id = "PluginsAutoUpdate", Version = "0.0.2-beta", Name = "PluginsAutoUpdate", Author = "aga", Description = "Checks GitHub releases for plugins and updates them.")]
+[PluginMetadata(Id = "PluginsAutoUpdate", Version = "0.0.3-beta", Name = "PluginsAutoUpdate", Author = "aga", Description = "Checks GitHub releases for plugins and updates them.")]
 public partial class PluginsAutoUpdate : BasePlugin
 {
   private CancellationTokenSource? _cts;
