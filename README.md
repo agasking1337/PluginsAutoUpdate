@@ -139,4 +139,5 @@ For major changes, please open an issue first to discuss what you would like to 
 ## Credits
 - Developed by [aga](https://github.com/agasking1337)
 - Readme template by [criskkky](https://github.com/criskkky)
+- Release workflow based on [K4ryuu/K4-Guilds-SwiftlyS2 release workflow](https://github.com/K4ryuu/K4-Guilds-SwiftlyS2/blob/main/.github/workflows/release.yml)
 - All contributors listed in the [Contributors Section](https://github.com/agasking1337/PluginsAutoUpdate/graphs/contributors)
